@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "papersignals"
+version = "0.1.0"
+description = "Academic writing quality analyzer — scores documents on signals Turnitin reads (burstiness, transitions, lexical diversity, vocabulary fingerprint, paragraph uniformity, readability, perplexity) with actionable feedback."
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Victor Ohis", email = "victorohisprojects@gmail.com"}
+]
+requires-python = ">=3.10"
+dependencies = [
+    "nltk>=3.8",
+    "python-docx>=1.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1",
+]
+corpus = [
+    "arxiv>=2.0",
+    "requests>=2.31",
+]
+
+[project.scripts]
+papersignals = "papersignals.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["papersignals*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
