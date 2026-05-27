@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "api": "cd .. && source venv/bin/activate && uvicorn api.main:app --reload --host 0.0.0.0 --port 8000",
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000"
+  }
+}

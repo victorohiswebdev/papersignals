@@ -32,6 +32,12 @@ data/corpus/*
 # Jupyter
 .ipynb_checkpoints/
 
+# Dashboard
+dashboard/.next/
+dashboard/node_modules/
+dashboard/out/
+dashboard/.env.local
+
 # Coverage
 htmlcov/
 .coverage
