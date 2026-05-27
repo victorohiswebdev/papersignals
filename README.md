@@ -47,6 +47,15 @@ papersignals analyze paper.md --json
 
 # Save report to file
 papersignals analyze thesis.docx --output report.md
+
+# Corpus management (Phase 2)
+papersignals corpus fetch                     # Fetch papers from arXiv
+papersignals corpus update                    # Analyze unanalyzed corpus papers
+papersignals corpus stats                     # Show corpus statistics
+papersignals corpus baseline                  # Compute baseline norms
+
+# Train the RF classifier (requires analyzed corpus)
+python -m papersignals.classifier.train
 ```
 
 ---
@@ -122,6 +131,11 @@ papersignals/
 
 ## Scoring Model
 
+PaperSignals offers **two scoring modes**:
+
+### Mode 1: Weighted Average (Rule-Based)
+Weighted average of all 7 signals (0–100, higher = more human-like):
+
 | Signal | Weight | AI-Typical | Human-Typical |
 |---|---|---|---|
 | Burstiness | 25% | SD 0.5–3 | SD 5–20 |
@@ -132,14 +146,22 @@ papersignals/
 | Paragraph Uniformity | 10% | SD <25 words | SD >45 words |
 | Perplexity (approx) | 5% | Low | High |
 
-Composite score = weighted average of all 7 signals (0-100, higher = more human-like).
+### Mode 2: Random Forest Classifier (Data-Driven)
+Trained on **516 real ArXiv papers + 516 synthetic AI versions** using the 7 signal metrics as features. Produces a calibrated probability (0–100%) that text is human-written. Runs automatically when a trained model is available.
+
+- **14 features** extracted from the 7 analyzers
+- **70.5% accuracy**, **0.78 ROC-AUC** (5-fold CV)
+- **Calibrated probabilities** via Platt scaling
+- Falls back to weighted average if no model found
+
+The RF classifier is automatically invoked during `papersignals analyze` — no extra flags needed.
 
 ---
 
 ## Roadmap
 
 - **Phase 1** ✅ — Core analysis engine (CLI, 7 analyzers, markdown/JSON reports)
-- **Phase 2** 🔜 — ArXiv corpus baseline norms, RF classifier calibration
+- **Phase 2** ✅ — ArXiv corpus baseline norms, RF classifier calibration
 - **Phase 3** 🔜 — FastAPI backend + Next.js dashboard
 
 See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.

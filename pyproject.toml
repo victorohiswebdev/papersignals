@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "papersignals"
-version = "0.1.0"
+version = "0.2.0"
 description = "Academic writing quality analyzer — scores documents on signals Turnitin reads (burstiness, transitions, lexical diversity, vocabulary fingerprint, paragraph uniformity, readability, perplexity) with actionable feedback."
 readme = "README.md"
 license = {text = "MIT"}
@@ -26,6 +26,11 @@ dev = [
 corpus = [
     "arxiv>=2.0",
     "requests>=2.31",
+    "tqdm>=4.64",
+]
+ml = [
+    "scikit-learn>=1.3",
+    "joblib>=1.3",
 ]
 
 [project.scripts]

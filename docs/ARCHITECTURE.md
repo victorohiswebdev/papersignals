@@ -31,14 +31,14 @@ PaperSignals is an **open-source writing quality analyzer** that scores document
 
 ---
 
-## 2. Module Map
+## 2. Module Map (Phase 2 — Updated)
 
 ```
 papersignals/
 ├── cli.py                      # Entry point: argparse CLI
 ├── core/
 │   ├── document.py             # Document parsing + sentence segmentation
-│   ├── scoring.py              # Normalization, weighting, composite score
+│   ├── scoring.py              # Normalization, weighting, composite + RF score
 │   └── report.py               # JSON / Markdown report generation
 ├── analyzers/
 │   ├── burstiness.py           # Sentence length variance → burstiness score
@@ -48,12 +48,20 @@ papersignals/
 │   ├── paragraph_uniformity.py # Paragraph length consistency
 │   ├── readability.py          # Flesch-Kincaid, Gunning Fog, SMOG
 │   └── perplexity.py           # Character/word n-gram surprisal
-├── corpus/
-│   ├── norms.py                # Baseline distributions from corpus analysis
-│   └── arxiv_fetcher.py        # arXiv API client (Phase 2)
-└── utils/
-    ├── text_utils.py           # Sentence splitting, word tokenization
-    └── wordlists.py            # Transition words, AI words, hedging lexicon
+├── corpus/                     # Phase 2 — ArXiv corpus & baseline norms
+│   ├── arxiv_fetcher.py        # arXiv API client with rate limiting & caching
+│   ├── corpus_db.py            # Local JSON-based paper & analysis storage
+│   ├── norms.py                # Percentile distribution computation
+│   └── pipeline.py             # Orchestrator: fetch → analyze → norms
+├── classifier/                 # Phase 2 — RF classifier
+│   ├── features.py             # Feature extraction from analyzer results
+│   ├── synthetic_ai.py         # Rule-based AI text generator for training data
+│   └── train.py                # Training pipeline (CV + calibration)
+├── utils/
+│   ├── text_utils.py           # Sentence splitting, word tokenization
+│   └── wordlists.py            # Transition words, AI words, hedging lexicon
+└── data/
+    └── wordlists/              # Flat text wordlist files
 ```
 
 ### Module Descriptions
@@ -266,27 +274,43 @@ papersignals corpus reset           # Reset to research-derived defaults
 
 ---
 
-## 6. Future Architecture
+## 6. Architecture History & Roadmap
 
-### Phase 2 — Corpus Calibration
+### Phase 2 ✅ — Completed: Corpus Calibration + RF Classifier
 
-**Goal:** Replace static research-derived thresholds with dynamic baselines computed from a large corpus of human-written academic papers.
+**Goal:** Replace static research-derived thresholds with dynamic baselines computed from a real corpus of human-written academic papers, and add a data-driven classifier.
 
-**Components:**
-- **`arxiv_fetcher.py`** — Downloads paper abstracts and full texts from arXiv API.
-- **`corpus/norms.py`** (upgraded) — Maintains rolling percentile distributions, updated on `corpus update`.
-- **RF Classifier** — Optional scikit-learn Random Forest trained on engineered features (the 7 signals). Provides a second opinion alongside the rule-based scoring.
+**What was built:**
+- **`corpus/arxiv_fetcher.py`** — Downloads paper abstracts and full texts from arXiv API with rate limiting and caching.
+- **`corpus/corpus_db.py`** — Local JSON-based database for paper metadata and analysis results.
+- **`corpus/norms.py`** — Computes percentile distributions for all signal metrics from analyzed papers. Produces threshold tables usable by `scoring.py`.
+- **`corpus/pipeline.py`** — End-to-end orchestrator: `fetch → analyze → norms`.
+- **`classifier/features.py`** — Extracts 14 feature vectors from the 7 analyzer results.
+- **`classifier/synthetic_ai.py`** — Rule-based AI text generator that applies AI-typical transformations to real text (uniform sentences, transition inflation, vocabulary injection).
+- **`classifier/__init__.py`** — Random Forest classifier with Platt-scaled probability calibration.
 
-**New data flow:**
+**Results:**
+- **Corpus:** 516 papers across 10 arXiv categories (cs.AI, cs.CL, cs.LG, cs.IR, cs.CY, cs.HC, stat.ML, stat.AP, eess.AS, eess.IV)
+- **Classifier:** 70.5% accuracy, 0.78 ROC-AUC (5-fold CV, 516 human + 516 synthetic AI)
+- **Top features:** Readability FK (14.7%), Readability Fog (14.1%), Transition density (12.8%), Vocabulary density (10.3%)
+- **Integration:** `papersignals analyze` automatically uses RF scoring when model is available, falls back to weighted average otherwise
+
+**Data flow:**
 ```
 ArXiv API → arxiv_fetcher.py → raw text → analyzer pipeline → feature vectors
-                                                                    │
-                                                                    ▼
-                                                          corpus/norms.py
-                                                    (updated percentiles)
+                                                                │
+                                                                ▼
+                                                      corpus/norms.py
+                                                (updated percentiles)
+                                                
+                                                                     Random Forest
+Human text → analyzer pipeline → feature vector ───→ ┌───────────┐  classifier  → RF score (0-100)
+                                                        │ RF + Platt │
+AI text → analyzer pipeline → feature vector ───→     │ calibration │
+                                                        └───────────┘
 ```
 
-### Phase 3 — Dashboard
+### Phase 3 🔜 — Dashboard
 
 **Goal:** Web-based GUI for visual analysis and batch processing.
 

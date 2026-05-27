@@ -77,6 +77,36 @@ def build_parser() -> argparse.ArgumentParser:
     corpus_subparsers.add_parser("update", help="Update the corpus database")
     corpus_subparsers.add_parser("stats", help="Show corpus statistics")
 
+    # corpus fetch
+    fetch_parser = corpus_subparsers.add_parser(
+        "fetch", help="Fetch papers from arXiv"
+    )
+    fetch_parser.add_argument(
+        "--categories",
+        nargs="+",
+        default=[],
+        help="arXiv categories to fetch (default: all default categories)",
+    )
+    fetch_parser.add_argument(
+        "--per-category",
+        type=int,
+        default=60,
+        help="Papers to fetch per category (default: 60)",
+    )
+    fetch_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-fetch even if cached",
+    )
+
+    # corpus baseline
+    baseline_parser = corpus_subparsers.add_parser(
+        "baseline", help="Compute baseline norms from analyzed corpus"
+    )
+    baseline_parser.add_argument(
+        "--output", type=str, default="", help="Output path for norms JSON"
+    )
+
     return parser
 
 
@@ -115,7 +145,7 @@ def run_analysis(file_path: str) -> Dict[str, Any]:
     }
     composite = compute_composite(scores)
 
-    return {
+    result = {
         "document": {
             "name": doc["name"],
             "path": doc["path"],
@@ -128,6 +158,18 @@ def run_analysis(file_path: str) -> Dict[str, Any]:
         "signals": signals,
         "composite": composite,
     }
+
+    # Include RF classifier score if model is available
+    try:
+        from papersignals.core.scoring import compute_rf_score
+
+        rf_result = compute_rf_score(signals)
+        if rf_result:
+            result["rf_classifier"] = rf_result
+    except Exception:
+        pass  # RF not available, skip silently
+
+    return result
 
 
 def handle_analyze(args: argparse.Namespace) -> int:
@@ -186,17 +228,80 @@ def handle_corpus(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, 1 for error).
     """
+    from papersignals.corpus import ArxivFetcher, CorpusDB
+    from papersignals.corpus.arxiv_fetcher import DEFAULT_CATEGORIES
+
     if args.corpus_command == "update":
-        print("Corpus update: Not yet implemented.")
-        print("This feature will analyze a directory of documents and store results.")
-        return 0
+        return _handle_corpus_update(args)
     elif args.corpus_command == "stats":
-        print("Corpus statistics: Not yet implemented.")
-        print("This feature will show aggregate statistics across the corpus.")
-        return 0
+        return _handle_corpus_stats(args)
+    elif args.corpus_command == "baseline":
+        return _handle_corpus_baseline(args)
+    elif args.corpus_command == "fetch":
+        return _handle_corpus_fetch(args)
     else:
-        print("Usage: papersignals corpus {update|stats}", file=sys.stderr)
+        print("Usage: papersignals corpus {update|stats|baseline|fetch}", file=sys.stderr)
         return 1
+
+
+def _handle_corpus_fetch(args: argparse.Namespace) -> int:
+    """Fetch papers from arXiv into the local corpus."""
+    from papersignals.corpus.arxiv_fetcher import DEFAULT_CATEGORIES
+
+    categories = getattr(args, "categories", None) or DEFAULT_CATEGORIES
+    per_category = getattr(args, "per_category", 60)
+    force = getattr(args, "force", False)
+
+    from papersignals.corpus.pipeline import cmd_fetch
+
+    print(f"📡 Fetching papers from {len(categories)} categories ...")
+    cmd_fetch(categories, per_category, force=force)
+    return 0
+
+
+def _handle_corpus_update(args: argparse.Namespace) -> int:
+    """Run analysis on new unanalyzed papers in the corpus."""
+    from papersignals.corpus.pipeline import cmd_analyze
+
+    limit = getattr(args, "limit", 0)
+    print(f"🔬 Analyzing unanalyzed papers in corpus ...")
+    count = cmd_analyze(limit=limit)
+    if count > 0:
+        print(f"✅ Analyzed {count} papers.")
+    return 0
+
+
+def _handle_corpus_stats(args: argparse.Namespace) -> int:
+    """Show corpus statistics."""
+    from papersignals.corpus.corpus_db import CorpusDB
+
+    db = CorpusDB()
+    metadata = db.get_metadata()
+
+    print(f"\n📊 Corpus Statistics")
+    print(f"   Total papers:     {metadata.total_papers}")
+    print(f"   Analyzed papers:  {metadata.total_analyzed}")
+    print(f"   Categories:       {len(metadata.categories)}")
+    print()
+
+    if metadata.categories:
+        print("   Per Category:")
+        for cat, count in list(metadata.categories.items())[:15]:
+            print(f"     {cat}: {count} papers")
+        if len(metadata.categories) > 15:
+            print(f"     ... and {len(metadata.categories) - 15} more")
+
+    return 0
+
+
+def _handle_corpus_baseline(args: argparse.Namespace) -> int:
+    """Compute and save baseline norms from analyzed corpus."""
+    from papersignals.corpus.pipeline import cmd_norms
+
+    print(f"📐 Computing baseline norms ...")
+    saved = cmd_norms(output_path=getattr(args, "output", ""))
+    print(f"✅ Baseline norms saved to: {saved}")
+    return 0
 
 
 def main(argv: Optional[list] = None) -> int:

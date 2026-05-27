@@ -74,6 +74,7 @@ def generate_markdown_report(analysis: dict) -> str:
     segments = analysis.get("segments", {})
     signals = analysis.get("signals", {})
     composite = analysis.get("composite", {})
+    rf_result = analysis.get("rf_classifier", None)
 
     lines: List[str] = []
     lines.append(f"# 📄 Papersignals Analysis Report")
@@ -84,10 +85,34 @@ def generate_markdown_report(analysis: dict) -> str:
     lines.append(f"**Paragraphs**: {segments.get('paragraph_count', 0)}")
     lines.append(f"")
 
-    # Composite score
+    # RF classifier score (Phase 2)
+    if rf_result and rf_result.get("mode") == "rf_classifier":
+        rf_score = rf_result.get("rf_score", 50.0)
+        rf_class = rf_result.get("rf_class", -1)
+        rf_risk = rf_result.get("risk", "medium")
+        rf_label = "Human-like" if rf_class == 1 else "AI-like"
+        lines.append(f"## 🤖 RF Classifier Assessment")
+        lines.append(f"")
+        lines.append(f"{_risk_emoji(rf_risk)} **Risk Level**: {rf_risk.upper()}")
+        lines.append(f"")
+        lines.append(f"**AI Detection Probability**:")
+        lines.append(f"")
+        lines.append(f"```")
+        lines.append(f"{_score_bar(rf_score)}")
+        lines.append(f"```")
+        lines.append(f"")
+        lines.append(f"**Classification**: {rf_label} (class {rf_class})")
+        lines.append(f"**Method**: Calibrated Random Forest")
+        ai_prob = 100.0 - rf_score
+        lines.append(f"**AI Probability**: {ai_prob:.1f}%")
+        lines.append(f"")
+        lines.append(f"---")
+        lines.append(f"")
+
+    # Weighted composite score
     comp_score = composite.get("composite_score", 50.0)
     comp_risk = composite.get("risk", "medium")
-    lines.append(f"## Overall Assessment")
+    lines.append(f"## Overall Assessment (Weighted Average)")
     lines.append(f"")
     lines.append(f"{_risk_emoji(comp_risk)} **Risk Level**: {comp_risk.upper()}")
     lines.append(f"")
